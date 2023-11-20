@@ -1,44 +1,78 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly_express as px
+from PIL import Image
+from PyPDF2 import PdfReader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+import google.generativeai as palm
+from langchain.embeddings import GooglePalmEmbeddings
+from langchain.llms import GooglePalm
+from langchain.vectorstores import FAISS
+from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
+import os
 
-st.markdown("<h1 style='text-align: left; color: green;'>Club and Nationality App</h1>", unsafe_allow_html=True)
-st.write("")
+os.environ['GOOGLE_API_KEY'] =  'AIzaSyBA6rw1EA4bYvKdkIOAglwtBlqqoIsisWI'
 
-@st.cache
-def load_data():
-	df = pd.read_csv("football_data.csv")
-	df.drop(['Unnamed: 0', 'ID'], axis = 1, inplace=True)
-	return df
+def get_pdf_text(pdf_docs):
+    text=""
+    for pdf in pdf_docs:
+        pdf_reader= PdfReader(pdf)
+        for page in pdf_reader.pages:
+            text+= page.extract_text()
+    return  text
 
-if st.checkbox("Select this checkbox to look at the data"):
-	st.write(load_data())
+def get_text_chunks(text):
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=20)
+    chunks = text_splitter.split_text(text)
+    return chunks
 
-df = load_data()
+def get_vector_store(text_chunks):
+    embeddings = GooglePalmEmbeddings()
+    vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
+    return vector_store
 
-clubs = st.sidebar.multiselect('Select Players for clubs', df['Club'].unique())
-nationalities = st.sidebar.multiselect('Select Players from Nationalities', df['Nationality'].unique())
+def get_conversational_chain(vector_store):
+    llm=GooglePalm()
+    memory = ConversationBufferMemory(memory_key = "chat_history", return_messages=True)
+    conversation_chain = ConversationalRetrievalChain.from_llm(llm=llm, retriever=vector_store.as_retriever(), memory=memory)
+    return conversation_chain
 
-new_df = df[(df['Club'].isin(clubs)) & (df['Nationality'].isin(nationalities))]
+def user_input(user_question):
+    response = st.session_state.conversation({'question': user_question})
+    st.session_state.chatHistory = response['chat_history']
+    for i, message in enumerate(st.session_state.chatHistory):
+        if i%2 == 0:
+            #st.subheader("Human: ", message.content)
+            st.write("Human: ", message.content)
+        elif i%2 == 1:
+            st.write("Bot: ", message.content)
+        elif i == 10:
+            st.session_state.clear()
+
+def main():
+    st.set_page_config("Chat with Knowledge Base")
+    st.header("Chat with your insurance GURU 💬")
+    image = Image.open('Image/QKLogo.png')
+    st.sidebar.image(image, caption='')
+    user_question = st.text_input("Ask a Question from the Insurance Knowledge Base")
+    if "conversation" not in st.session_state:
+        st.session_state.conversation = None
+    if "chatHistory" not in st.session_state:
+        st.session_state.chatHistory = None
+    if user_question:
+        user_input(user_question)
+    with st.sidebar:
+        st.title("Settings")
+        st.subheader("Upload your Documents")
+        pdf_docs = st.file_uploader("Upload your PDF Files and Click on the Process Button", accept_multiple_files=True)
+        if st.button("Process"):
+            with st.spinner("Processing"):
+                raw_text = get_pdf_text(pdf_docs)
+                text_chunks = get_text_chunks(raw_text)
+                vector_store = get_vector_store(text_chunks)
+                st.session_state.conversation = get_conversational_chain(vector_store)
+                st.success("Done")
 
 
-if clubs and nationalities is not None:
-	if len(new_df) != 0:
-		st.write("Summary of the selected combination of club and nationality:")
-		st.write(new_df)
-		st.write("Simple chart between player age and overall age of all the players")
-		fig = px.scatter(new_df, x ='Overall',y='Age', color='Name')
-		st.plotly_chart(fig)
-	else:
-		# st.markdown("### No player with that combination was found!!!")
-		st.markdown(
-		"""
 
-		This very simple webapp allows you to select and visualize players from certain clubs and certain nationalities
-
-		👈 Select one or more clubs and nationalities
-
-		"""
-		)
-
+if __name__ == "__main__":
+    main()
