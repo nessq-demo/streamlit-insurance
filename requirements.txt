@@ -16,3 +16,4 @@ setuptools~=60.2.0
 packaging~=23.2
 zipp~=3.17.0
 tqdm~=4.66.1
+google-generativeai
