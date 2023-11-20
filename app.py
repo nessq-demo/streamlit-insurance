@@ -51,8 +51,8 @@ def user_input(user_question):
 def main():
     st.set_page_config("Chat with Knowledge Base")
     st.header("Chat with your insurance GURU 💬")
-    image = Image.open('Image/QKLogo.png')
-    st.sidebar.image(image, caption='')
+    #image = Image.open('Image/QKLogo.png')
+    #st.sidebar.image(image, caption='')
     user_question = st.text_input("Ask a Question from the Insurance Knowledge Base")
     if "conversation" not in st.session_state:
         st.session_state.conversation = None
