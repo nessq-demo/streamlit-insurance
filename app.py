@@ -41,12 +41,12 @@ def user_input(user_question):
     st.session_state.chatHistory = response['chat_history']
     for i, message in enumerate(st.session_state.chatHistory):
         if i%2 == 0:
-            #st.subheader("Human: ", message.content)
-            st.write("Human: ", message.content)
+            with st.chat_message("user"):
+                st.markdown(mes)
         elif i%2 == 1:
-            st.write("Bot: ", message.content)
-        elif i == 10:
-            st.session_state.clear()
+            with st.chat_message("assistant"):
+                st.markdown(mes)
+        
 
 def main():
     st.set_page_config("Chat with Knowledge Base")
